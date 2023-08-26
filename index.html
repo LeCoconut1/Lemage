@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>physics...</title>
+
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <script>
+    // Set up the scene
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Create a cube as our object
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cubeMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    scene.add(cube);
+
+    // Add a light source
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(1, 1, 1).normalize();
+    scene.add(ambientLight, directionalLight);
+
+    // Set up gravity
+    const gravity = new THREE.Vector3(0, -0.01, 0);
+    const jumpVelocity = 0.2;
+    const bounciness = 0.6;
+
+    // Set up velocity and position for the cube
+    const velocity = new THREE.Vector3(0, 0, 0);
+    const position = cube.position;
+
+    // Set up rotation for the cube
+    const rotationSpeed = 0.02;
+    const rotation = cube.rotation;
+
+    // Create an outline material
+    const outlineMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.BackSide });
+
+    // Create the outline object
+    const outline = new THREE.Mesh(cubeGeometry, outlineMaterial);
+    outline.scale.multiplyScalar(1.05); // Slightly larger to create an outline effect
+    cube.add(outline);
+
+    // Create the ground plane
+    const groundGeometry = new THREE.PlaneGeometry(10, 10);
+    const groundMaterial = new THREE.ShaderMaterial({
+      vertexShader: `
+        void main() {
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        void main() {
+          gl_FragColor = vec4(0.7, 0.7, 0.7, 1.0);
+        }
+      `
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1.1; // Slightly above the cube's bottom face
+    scene.add(ground);
+
+    // Keyboard input handling
+    const moveSpeed = 0.1;
+
+    const keyState = {};
+
+    // Rotation direction for cube
+    let rotationDirection = 0; // 0 for no rotation, -1 for counter-clockwise, 1 for clockwise
+
+    window.addEventListener('keydown', (event) => {
+      keyState[event.key] = true;
+
+      // Set rotation direction
+      if (event.key === 'q') {
+        rotationDirection = -1;
+      }
+      if (event.key === 'e') {
+        rotationDirection = 1;
+      }
+
+      // Jumping logic
+      if (event.key === ' ' && !isJumping) {
+        velocity.y = jumpVelocity;
+        isJumping = true;
+      }
+    });
+
+    window.addEventListener('keyup', (event) => {
+      keyState[event.key] = false;
+
+      // Clear rotation direction when keys are released
+      if (event.key === 'q' || event.key === 'e') {
+        rotationDirection = 0;
+      }
+    });
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+
+      //camera following the cube
+      camera.position.y = cube.position.y + 1;
+      camera.position.z = cube.position.z + 3;
+      camera.position.x = cube.position.x;
+
+      // Rotate the cube based on key inputs
+      if (rotationDirection === -1) {
+        cube.rotation.y += rotationSpeed;
+      }
+      if (rotationDirection === 1) {
+        cube.rotation.y -= rotationSpeed;
+      }
+
+      // Move the cube based on key inputs
+      if (keyState['a']) {
+        position.x -= moveSpeed;
+      }
+      if (keyState['d']) {
+        position.x += moveSpeed;
+      }
+      if (keyState['w']) {
+        position.z -= moveSpeed;
+      }
+      if (keyState['s']) {
+        position.z += moveSpeed;
+      }
+
+      // Apply gravity to the velocity
+      velocity.add(gravity);
+
+      // Update the position based on velocity
+      position.add(velocity);
+
+      // Check if the cube is on the ground
+      if (position.y <= ground.position.y + cube.geometry.parameters.height / 2) {
+        // Make the cube bounce
+        position.y = ground.position.y + cube.geometry.parameters.height / 2;
+        velocity.y *= -bounciness;
+        isJumping = false; // Reset the isJumping flag
+      }
+
+      cube.position.copy(position);
+
+      renderer.render(scene, camera);
+    }
+
+    // Start the animation loop
+    animate();
+  </script>
+</body>
+</html>
